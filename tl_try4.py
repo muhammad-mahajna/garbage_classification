@@ -45,9 +45,9 @@ def load_data(data_dir):
     return np.array(image_paths), np.array(texts), np.array(labels)
 
 # Load data
-train_dir = '../../data/enel645_2024f/garbage_data/CVPR_2024_dataset_Train'
-val_dir = '../../data/enel645_2024f/garbage_data/CVPR_2024_dataset_Val'
-test_dir = '../../data/enel645_2024f/garbage_data/CVPR_2024_dataset_Test'
+train_dir = '/work/TALC/enel645_2024f/garbage_data/CVPR_2024_dataset_Train'
+val_dir = '/work/TALC/enel645_2024f/garbage_data/CVPR_2024_dataset_Val'
+test_dir = '/work/TALC/enel645_2024f/garbage_data/CVPR_2024_dataset_Test'
 
 train_image_paths, train_texts, train_labels = load_data(train_dir)
 val_image_paths, val_texts, val_labels = load_data(val_dir)
