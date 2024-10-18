@@ -63,12 +63,13 @@ def get_image_caption(image):
 descriptions = []
 
 for image_path in image_paths:
-    print(parsed_answer)
+    
     parsed_answer = get_image_caption(Image.open(image_path))
     descriptions.append({
         "image": image_path,
         "description": parsed_answer
     })
+    print(parsed_answer)
     
 # Save descriptions to CSV
 import pandas as pd
