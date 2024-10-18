@@ -2,8 +2,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=2
 #SBATCH --cpus-per-task=1
-#SBATCH --time=04:00:00
-#SBATCH --mem=16GB
+#SBATCH --time=10:00:00
+#SBATCH --mem=48GB
 #SBATCH --job-name=MyFirstJobOnARC
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
@@ -12,9 +12,9 @@
 #SBATCH --output=OutputFromMyFirstJob_%j.out
 #SBATCH --error=ErrorFromMyFirstJob_%j.err    # Standard error
 
-sleep 10s
+sleep 1s
 echo Hello World
 echo Starting model training
-python tl_try3.py
+python gen_captions_for_images.py
 
 echo Finished model training
