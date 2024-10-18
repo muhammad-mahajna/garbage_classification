@@ -15,6 +15,6 @@
 sleep 1s
 echo Hello World
 echo Starting model training
-python gen_captions_for_images.py
+python tl_try5.py
 
 echo Finished model training
