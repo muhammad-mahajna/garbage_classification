@@ -15,6 +15,6 @@
 sleep 1s
 echo Hello World
 echo Starting model training
-python tl_try5.py
+python tl_try3.py
 
 echo Finished model training

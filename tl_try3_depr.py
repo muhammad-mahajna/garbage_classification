@@ -17,10 +17,7 @@ import seaborn as sns
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 print(f'Using device: {device}')
 
-# %%
-
 # Data preparation
-# Load data
 def load_data(data_dir):
     image_paths = []
     texts = []
@@ -47,27 +44,10 @@ def load_data(data_dir):
 
     return np.array(image_paths), np.array(texts), np.array(labels)
 
-# Function to detect the base directory depending on the PC
-def detect_base_directory():
-    possible_dirs = [
-        r"/work/TALC/enel645_2024f/garbage_data",  # Directory on TALC cluster
-        r"../../data/enel645_2024f/garbage_data"  # Directory on LAPTOP
-    ]
-
-    for base_dir in possible_dirs:
-        if os.path.exists(base_dir):
-            print(f"Using base directory: {base_dir}")
-            return base_dir
-
-    raise ValueError("No valid base directory found.")
-
-# Base directory detection
-base_dir = detect_base_directory()
-
-# Define the train, val, and test directories
-train_dir = os.path.join(base_dir, "CVPR_2024_dataset_Train")
-val_dir = os.path.join(base_dir, "CVPR_2024_dataset_Val")
-test_dir = os.path.join(base_dir, "CVPR_2024_dataset_Test")
+# Load data
+train_dir = '/work/TALC/enel645_2024f/garbage_data/CVPR_2024_dataset_Train'
+val_dir = '/work/TALC/enel645_2024f/garbage_data/CVPR_2024_dataset_Val'
+test_dir = '/work/TALC/enel645_2024f/garbage_data/CVPR_2024_dataset_Test'
 
 train_image_paths, train_texts, train_labels = load_data(train_dir)
 val_image_paths, val_texts, val_labels = load_data(val_dir)
@@ -138,8 +118,6 @@ train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-# %%
-
 # Multimodal model combining ResNet50 and DistilBERT
 class MultimodalModel(nn.Module):
     def __init__(self, num_classes):
@@ -180,7 +158,6 @@ class MultimodalModel(nn.Module):
         output = self.fc(combined_features)
         return output
 
-
 # Hyperparameters and model setup
 num_classes = 4
 learning_rate = 2e-5
@@ -212,7 +189,6 @@ criterion = nn.CrossEntropyLoss(weight=class_weights)
 optimizer = optim.AdamW(model.parameters(), lr=learning_rate)
 scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
 
-# %%
 # Training with early stopping
 best_val_loss = float('inf')
 patience = 5
@@ -276,11 +252,8 @@ for epoch in range(num_epochs):
             print("Early stopping triggered")
             break
 
-
-
-# %%
 # Load the best model and evaluate on the test set
-model.load_state_dict(torch.load('best_multimodal_model.pth', map_location=torch.device('mps')))
+model.load_state_dict(torch.load('best_multimodal_model.pth'))
 model.eval()
 test_predictions = []
 with torch.no_grad():
