@@ -10,11 +10,14 @@
 #SBATCH --mail-type=END
 #SBATCH --mail-user=muhammad.mahajna@ucalgary.ca
 #SBATCH --output=OutputFromMyFirstJob_%j.out
-#SBATCH --error=ErrorFromMyFirstJob_%j.err    # Standard error
+#SBATCH --error=ErrorFromMyFirstJob_%j.err
 
-sleep 1s
-echo Hello World
+# Activate Python environment
+source activate my_env  # Use the name of your conda environment
+
+# Notify starting model training
 echo Starting model training
 python tl_try3.py
 
+# Notify end of training
 echo Finished model training
