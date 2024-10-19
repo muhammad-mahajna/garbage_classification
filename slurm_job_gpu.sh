@@ -13,7 +13,7 @@
 #SBATCH --error=ErrorFromMyFirstJob_%j.err
 
 # Activate Python environment
-source activate my_env  # Use the name of your conda environment
+source activate mm_enel645_assg2
 
 # Notify starting model training
 echo Starting model training
