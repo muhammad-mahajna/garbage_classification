@@ -21,6 +21,9 @@ conda install pytorch torchvision torchaudio -c pytorch -y
 conda install -c conda-forge transformers -y
 conda install -c conda-forge scikit-learn matplotlib seaborn -y
 conda install pillow numpy pandas -y
+conda install -c conda-forge tensorflow -y
+conda install -c conda-forge shap -y
+
 
 # List installed packages
 echo "Listing installed packages..."
