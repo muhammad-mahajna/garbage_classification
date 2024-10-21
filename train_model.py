@@ -396,9 +396,6 @@ class MultimodalModel(nn.Module):
             nn.Linear(512, num_classes)
         )
 
-        # Initialize weights for fully connected layers
-        self._init_weights()
-
     def forward(self, images, input_ids, attention_mask):
         # Extract image features using ResNet50
         image_features = self.resnet(images)
@@ -412,14 +409,6 @@ class MultimodalModel(nn.Module):
         # Pass through fully connected layers
         output = self.fc(combined_features)
         return output
-
-    def _init_weights(self):
-        # Initialize the weights of fully connected layers for stability
-        for layer in self.fc:
-            if isinstance(layer, nn.Linear):
-                nn.init.xavier_uniform_(layer.weight)
-                if layer.bias is not None:
-                    nn.init.constant_(layer.bias, 0)
 
 # Hyperparameters and model setup
 num_classes = len(label_map)
@@ -517,19 +506,19 @@ for epoch in range(num_epochs):
     # Check for early stopping
     if val_loss < best_val_loss:
         print(f"Validation loss improved ({best_val_loss:.4f} → {val_loss:.4f}). Saving model...")
-        torch.save(model.state_dict(), f'best_multimodal_model_epoch_{epoch+1}.pth')  # Save the best model with epoch info
+        torch.save(model.state_dict(), f'best_multimodal_model.pth')  # Save the best model with epoch info
         best_val_loss = val_loss  # Update best validation loss value
         epochs_no_improve = 0  # Reset the counter
     else:
         epochs_no_improve += 1
         if epochs_no_improve >= patience:
             print("Early stopping triggered. Restoring the best model...")
-            model.load_state_dict(torch.load('best_multimodal_model_epoch_{epoch+1}.pth'))  # Restore best model
+            model.load_state_dict(torch.load('best_multimodal_model.pth'))  # Restore best model
             break
 
 
 # %%
-# Load the best model and evaluate on the test set. Steps are similar to the validation phase
+# Load the model and evaluate on the test set. Steps are similar to the validation phase
 # Before running this cell, make sure that the '# DL Model' cell was properly executed
 
 # Load the best model weights
@@ -605,7 +594,7 @@ print("Indices of the mistakes:", mistaken_indices)
 # Load the image
 #print(test_image_paths[mistaken_indices])
 
-ind = mistaken_indices[16]
+ind = mistaken_indices[1]
 image_path = test_image_paths[ind]
 
 image = Image.open(image_path)
