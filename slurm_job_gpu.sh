@@ -17,7 +17,7 @@
 
 # Notify starting model training
 echo Starting model training
-time python -u train_model.py
+time python -u model_class_specific.py
 
 # Notify end of training
 echo Finished model training
