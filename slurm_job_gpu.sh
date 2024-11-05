@@ -13,11 +13,11 @@
 #SBATCH --error=ErrorFromMyFirstJob_%j.err
 
 # Activate Python environment
-source activate mm_enel645_assg2
+# source activate mm_enel645_assg2
 
 # Notify starting model training
 echo Starting model training
-python tl_try3.py
+time python -u train_model.py
 
 # Notify end of training
 echo Finished model training
