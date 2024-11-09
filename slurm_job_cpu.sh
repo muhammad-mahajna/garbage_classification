@@ -12,8 +12,9 @@
 #SBATCH --error=ErrorFromMyFirstJob_%j.err    # Standard error
 
 sleep 1s
-echo Hello World
+echo Hi!
 echo Starting model training
+
 time python -u train_model.py
 
 echo Finished model training
