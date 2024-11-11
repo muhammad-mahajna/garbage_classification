@@ -20,7 +20,10 @@
 # ├── model_notebook.py                # Jupyter notebook for training and evaluating the model
 # ├── train_model.py                   # Python script for training the model (same code as the notebook)
 # ├── slurm_job_gpu.sh                 # Slurm submission script (using GPU)
-# └── slurm_job_cpu.sh                 # Slurm submission script (using CPU)
+# ├── slurm_job_cpu.sh                 # Slurm submission script (using CPU)
+# ...
+# └── temp/                            # Folder containing temporary code that was tried. There is no guarantee that this code will work but it   gives an overview of the motheds I tried. It also contains 3 CSV files (train_image_descriptions, val_image_descriptions, test_image_descriptions) which contain captions that were generated using Microsoft's Frorence model. 
+# 
 # ```
 # 
 # ## Setup Instructions
@@ -141,6 +144,8 @@ from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, r
 import matplotlib.pyplot as plt
 import seaborn as sns
 import socket
+import random
+from collections import Counter
 
 hostname = socket.gethostname()
 
@@ -290,7 +295,7 @@ def calculate_class_weights(train_dir, label_map):
 
     class_weights = 1.0 / class_counts
     class_weights = class_weights / class_weights.sum()  # Normalize (sum to 1)
-    return torch.tensor(class_weights, dtype=torch.float32)
+    return class_weights
 
 # Usage - Get the base directory and start working
 base_dir = detect_base_directory()
@@ -318,7 +323,7 @@ test_dataset  = MultimodalDataset(test_image_paths, test_texts, test_labels, tra
 
 # Adjustable based on available memory and system capabilities. 
 # For local training, any value higher than 16 will cause an out of memory error. For the cluster, higher values can be used
-batch_size = 32  
+batch_size = 8
 if "TALC" in hostname:
     batch_size = 64
 
@@ -326,10 +331,10 @@ nworkers = os.cpu_count()//2 # for some reason this crashes the DataLoaders on a
 nworkers = 0 
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=nworkers, pin_memory=True)
 val_loader   = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=nworkers, pin_memory=True)
-test_loader  = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=nworkers, pin_memory=True)
+test_loader  = DataLoader(test_dataset, batch_size=2*batch_size, shuffle=False, num_workers=nworkers, pin_memory=True) # This does not change the time but it might reduce the overhead
 
 # Calculate class weights for loss function and move to device
-class_weights = calculate_class_weights(train_dir, label_map).to(device)
+class_weights = torch.tensor((np.array([1.5, 1, 1, 1.5]) * calculate_class_weights(train_dir, label_map) * 4/5), dtype=torch.float32).to(device)
 
 # Print class weights
 for class_name, weight in zip(label_map.keys(), class_weights):
@@ -427,18 +432,21 @@ optimizer = optim.AdamW(mmodel.parameters(), lr=learning_rate)
 scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
 
 # %%
-# Training loop with early stopping
-best_val_loss = float('inf')    # start with a very high value (infinity)
-patience = 3                    # How many epochs without improvement to allow
+best_val_loss = float('inf')    # Start with a very high value (infinity)
+patience = 5                    # How many epochs without improvement to allow
 num_epochs = 10                 # Maximum number of training epochs
 epochs_no_improve = 0           # Counter for epochs with no improvement
 
+train_losses = []               # Array to store training losses
+val_losses = []                 # Array to store validation losses
+
+print("Starting model training. Hang tight, that might take a while!")
 for epoch in range(num_epochs):
     # Training phase
     mmodel.train()
-    train_loss = 0.0 # reset value 
+    train_loss = 0.0  # Reset value
     for batch in train_loader:
-        # Move batch data to device (with pin_memory enabled in DataLoader)
+        # Move batch data to device
         images = batch['image'].to(device, non_blocking=True)
         input_ids = batch['input_ids'].to(device, non_blocking=True)
         attention_mask = batch['attention_mask'].to(device, non_blocking=True)
@@ -462,8 +470,9 @@ for epoch in range(num_epochs):
         # Accumulate training loss
         train_loss += loss.item()
     
-    # Normalize train_loss by the number of batches
+    # Normalize train_loss by the number of batches and store it
     train_loss /= len(train_loader)
+    train_losses.append(train_loss)  # Save train loss for the epoch
     
     # Validation phase
     mmodel.eval()  # Change state to validation mode
@@ -489,8 +498,9 @@ for epoch in range(num_epochs):
             y_true.extend(labels.cpu().numpy())
             y_pred.extend(preds.cpu().numpy())
 
-    # Normalize the validation loss by the number of batches
+    # Normalize the validation loss by the number of batches and store it
     val_loss /= len(val_loader)
+    val_losses.append(val_loss)  # Save validation loss for the epoch
 
     # Calculate statistical metrics on the entire validation set
     val_accuracy = accuracy_score(y_true, y_pred)
@@ -505,7 +515,7 @@ for epoch in range(num_epochs):
     # Check for early stopping
     if val_loss < best_val_loss:
         print(f"Validation loss improved ({best_val_loss:.4f} → {val_loss:.4f}). Saving model...")
-        torch.save(mmodel.state_dict(), f'best_multimodal_model.pth')  # Save the best model with epoch info
+        torch.save(mmodel.state_dict(), 'best_multimodal_model.pth')  # Save the best model with epoch info
         best_val_loss = val_loss  # Update best validation loss value
         epochs_no_improve = 0  # Reset the counter
     else:
@@ -517,20 +527,52 @@ for epoch in range(num_epochs):
 
 
 # %%
+# Plot the training and validation losses and investigate them
+
+fig, ax1 = plt.subplots(figsize=(10, 5))
+
+# First y-axis for training loss
+ax1.plot(train_losses, color='cornflowerblue', label='Log Training Loss')
+ax1.set_xlabel('Epoch')
+ax1.set_ylabel('Training Loss', color='cornflowerblue')
+ax1.tick_params(axis='y', labelcolor='cornflowerblue')
+
+# Create a second y-axis for validation loss
+ax2 = ax1.twinx()
+ax2.plot(val_losses, color='salmon', label='Log Validation Loss')
+ax2.set_ylabel('Validation Loss', color='salmon')
+ax2.tick_params(axis='y', labelcolor='salmon')
+
+# Add a title and show the plot
+plt.title('Training and Validation Loss Over Epochs')
+fig.tight_layout()
+plt.show()
+
+# %%
 # Load the model and evaluate on the test set. Steps are similar to the validation phase
 # Before running this cell, make sure that the '# DL Model' cell was properly executed
 
+print("Evaluating the model on the test dataset.")
+
 # Load the best model weights
-mmodel.load_state_dict(torch.load('best_multimodal_model.pth', map_location=device))
+mmodel.load_state_dict(torch.load('best_multimodal_model.pth', map_location=device, weights_only=True))
 mmodel.eval()  # Set the model to evaluation mode
 
 # Initialize variables for collecting results
 test_predictions = []
 test_labels = []
 
+# Track progress
+num_batches = len(test_loader)
+print_every = max(1, num_batches // 10)  # Print every 5% of batches, at minimum every 1 batch
+
 # Disable gradient computation for inference
 with torch.no_grad():
-    for batch in test_loader:
+    for batch_idx, batch in enumerate(test_loader):
+        # Print feedback on progress
+        if (batch_idx + 1) % print_every == 0 or (batch_idx + 1) == num_batches:
+            print(f"Processing batch {batch_idx + 1}/{num_batches}")
+
         # Move batch data to the device
         images = batch['image'].to(device)
         input_ids = batch['input_ids'].to(device)
@@ -544,6 +586,10 @@ with torch.no_grad():
         # Store predictions and true labels for metric calculation
         test_predictions.extend(preds.cpu().numpy())
         test_labels.extend(labels.cpu().numpy())
+        
+
+print("Evaluation on test dataset complete.")
+
 
 # %%
 # Statistical analysis of the test set
@@ -583,18 +629,96 @@ for i, accuracy in enumerate(class_accuracy):
     print(f'Accuracy for {class_name}: {accuracy:.4f}')
 
 
+# Looking at the CM, we can see that the model excels at detecting 'Green' samples (high sensitivity with low false detections).
+# It also does good job in the 'Blue' outcomes, but the false detections are quite high for this class (look at the second column from the left).
+# This suggests that the model has some trouble with this class as many samples from the Black and TTR classes are misclassifed as Blue. 
+# We'll see that later in the code also.
+
 # %%
 # Take a loot at some of the miscalssifed results
-mistaken_indices = [i for i, (true, pred) in enumerate(zip(test_labels, test_predictions)) if true == 0 and pred == 1]
-print(f'Number of cases where "Black" was mistakenly identified as "Blue": {len(mistaken_indices)}')
+
+i0 = 3  # True label
+i1 = 1  # Predicted label (false predictions)
+mistaken_indices = [i for i, (true, pred) in enumerate(zip(test_labels, test_predictions)) if true == i0 and pred == i1]
+
+# Display the count and indices of misclassified cases
+print(f'Number of cases where {label_names[i0]} was mistakenly identified as {label_names[i1]}: {len(mistaken_indices)}')
 print("Indices of the mistakes:", mistaken_indices)
 
-# Load the image
+# Randomly select up to 10 misclassified images if there are enough examples
+max_display = 10
+if len(mistaken_indices) > max_display:
+    display_indices = random.sample(mistaken_indices, max_display)
+else:
+    display_indices = mistaken_indices
 
-#ind = mistaken_indices[8]
-
-# Loop through each mistaken index and display the image
-for ind in mistaken_indices:    
-    # Print the corresponding text description
+# Loop through the selected mistaken indices and display the images
+for ind in display_indices:
+    image_path = test_image_paths[ind]  # Get the image path for the current mistaken index
+    image = Image.open(image_path)      # Load the image
+    
+    # Plot the image with a smaller figure size
+    plt.figure(figsize=(4, 3))
+    plt.imshow(image)
+    plt.axis('off')  # Hide the axes
+    plt.title(f"True: {label_names[i0]}, Predicted: {label_names[i1]}\nImage Path: {image_path}")
+    plt.show()
+    
+    # Print the corresponding text description if available
     print(f"Text description: {test_texts[ind]}")
+
+
+# %%
+# Now let's take a loot at the misclassified cases and see if there is a common ground for them
+
+all_misclassified_texts = []
+
+for i0 in range(4):  # assuming there are 4 classes, indexed from 0 to 3
+    
+    # Fixed predicted label for analysis; adjust if you want to analyze multiple predicted labels
+    # i1 = 1 : Blue 
+    i1 = 1
+    if i0 == i1:
+        continue
+
+    # Find misclassified indices where the true label is i0 and the predicted label is i1
+    mistaken_indices = [i for i, (true, pred) in enumerate(zip(test_labels, test_predictions)) if true == i0 and pred == i1]
+    
+    # Append misclassified texts for the current i0 value
+    all_misclassified_texts.extend([test_texts[ind] for ind in mistaken_indices])
+
+# Combine all texts into a single string
+combined_text = " ".join(all_misclassified_texts).lower()
+
+# Remove punctuation and split into individual words
+words = re.findall(r'\b\w+\b', combined_text)
+
+# Count word frequencies
+word_counts = Counter(words)
+
+# Display the 10 most common words
+print("Most common words in all misclassified texts:")
+for word, count in word_counts.most_common(10):
+    print(f"{word}: {count/len(all_misclassified_texts)*100:.1f}%")
+
+# In the current run, I see the following results (i1=1, Blue):
+''' Most common words in all misclassified texts:
+empty: 25.0%
+bottle: 16.8%
+container: 15.2%
+plastic: 13.0%
+bag: 11.4%
+paper: 6.5%
+box: 6.0%
+cleaner: 5.4%
+foil: 4.3%
+old: 3.8% '''
+
+# This means that cases that were miscalssified as Blue does contain some common ground. 
+# For example, the words 'empty', 'bottle', and 'container' appear in many of the cases. 
+# This is the test set therefore it's not recomended to go back and modify the model but it can give us some directions for improvement. 
+# One approach that I was thinking of is to create an additional classifer for 'Blue' only. Once we get a 'Blue' prediction, 
+# we apply this classifier (simple CNN+FCC or using a caption generator to enhace the description) to get a better outcome 
+# (to distingiush between 'True Blue' and the other classes)
+
 
