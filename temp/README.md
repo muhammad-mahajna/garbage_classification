@@ -119,10 +119,3 @@ This project uses a combination of image data and text descriptions to classify 
 3. **Training**: Uses a weighted cross-entropy loss function to account for class imbalance.
 4. **Evaluation**: Performance metrics like accuracy, precision, recall, and confusion matrix are computed.
 
-## Contact Information
-
-For any questions or issues, please reach out to `muhammad.mahajna@ucalgary.ca`.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
